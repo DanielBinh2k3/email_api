@@ -7,10 +7,9 @@ import os
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import JsonOutputParser
+from langchain.output_parsers import ResponseSchema, StructuredOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 
 load_dotenv()  # Load environment variables
@@ -21,7 +20,7 @@ if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_GEMINI_API_KEY environment variable not set")
 genai.configure(api_key=GOOGLE_API_KEY)
 #Using gemini-2.0-flash for this example.
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=GOOGLE_API_KEY, convert_system_message_to_human=True)
 
 # --- Pydantic Models ---
 class ContactInfo(BaseModel):
@@ -80,6 +79,9 @@ app.add_middleware(
 @app.post("/api/generate-email")
 async def generate_email(email_params: EmailParams = Body(...)):
     try:
+        # Using JSON output parser
+        json_parser = JsonOutputParser()
+        
         prompt_template = """
         Tạo một email dựa trên các thông tin sau:
 
@@ -102,10 +104,13 @@ async def generate_email(email_params: EmailParams = Body(...)):
         Giọng văn mong muốn: {tone}
         Độ dài mong muốn: {length}
 
-        Vui lòng tạo một email hoàn chỉnh, được định dạng tốt.
+        Vui lòng trả về JSON với định dạng như sau:
+        {{
+          "generatedEmail": "Nội dung email hoàn chỉnh ở đây"
+        }}
         """
         prompt = PromptTemplate.from_template(prompt_template)
-        chain = prompt | llm | StrOutputParser()
+        chain = prompt | llm | json_parser
         result = chain.invoke({
             "sales_name": email_params.sales_info.name,
             "sales_title": email_params.sales_info.title,
@@ -121,7 +126,7 @@ async def generate_email(email_params: EmailParams = Body(...)):
             "length": email_params.length,
         })
 
-        return {"generatedEmail": result}
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -132,28 +137,64 @@ async def refine_email(refinement_request: EmailRefinementRequest = Body(...)):
     try:
         refinement_type = refinement_request.refinementType
         email_content = refinement_request.emailContent
+        
+        # Using JSON output parser
+        json_parser = JsonOutputParser()
 
         if refinement_type == 'professional':
-            prompt_template = "Chỉnh sửa email sau để làm cho nó chuyên nghiệp hơn:\n\n{email_content}"
+            prompt_template = """
+            Chỉnh sửa email sau để làm cho nó chuyên nghiệp hơn:
+            
+            {email_content}
+            
+            Trả về kết quả dưới dạng JSON với định dạng:
+            {{
+              "refinedEmail": "Nội dung email đã được chỉnh sửa ở đây"
+            }}
+            """
         elif refinement_type == 'shorter':
-            prompt_template = "Chỉnh sửa email sau để làm cho nó ngắn gọn và súc tích hơn:\n\n{email_content}"
+            prompt_template = """
+            Chỉnh sửa email sau để làm cho nó ngắn gọn và súc tích hơn:
+            
+            {email_content}
+            
+            Trả về kết quả dưới dạng JSON với định dạng:
+            {{
+              "refinedEmail": "Nội dung email đã được chỉnh sửa ở đây"
+            }}
+            """
         elif refinement_type == 'personalized':
-            prompt_template = "Chỉnh sửa email sau để làm cho nó cá nhân hóa hơn, xưng hô với người nhận bằng tên và đề cập đến công ty của họ:\n\n{email_content}"
+            prompt_template = """
+            Chỉnh sửa email sau để làm cho nó cá nhân hóa hơn, xưng hô với người nhận bằng tên và đề cập đến công ty của họ:
+            
+            {email_content}
+            
+            Trả về kết quả dưới dạng JSON với định dạng:
+            {{
+              "refinedEmail": "Nội dung email đã được chỉnh sửa ở đây"
+            }}
+            """
         elif refinement_type == 'improvement':  #For auto suggestion
-            prompt_template = """Dựa trên phản hồi của chuyên gia, hãy viết lại và cải thiện email sau. Cố gắng đạt được điểm số hoàn hảo.
+            prompt_template = """
+            Dựa trên phản hồi của chuyên gia, hãy viết lại và cải thiện email sau. Cố gắng đạt được điểm số hoàn hảo.
 
-                                Email gốc:
-                                {email_content}
+            Email gốc:
+            {email_content}
 
-                                Phản hồi và đề xuất ngắn gọn:
-                                {suggestions}
+            Phản hồi và đề xuất ngắn gọn:
+            {suggestions}
 
-                                Email đã cải thiện:"""
+            Trả về kết quả dưới dạng JSON với định dạng:
+            {{
+              "refinedEmail": "Nội dung email đã cải thiện ở đây"
+            }}
+            """
         else:
             raise HTTPException(status_code=400, detail="Invalid refinement type")
 
         prompt = PromptTemplate.from_template(prompt_template)
-        chain = prompt | llm | StrOutputParser()
+        chain = prompt | llm | json_parser
+        
         if refinement_type == 'improvement': # Pass suggestions to prompt
             if not refinement_request.suggestions:
                 raise HTTPException(status_code=400, detail="Suggestions required for improvement refinement type")
@@ -161,26 +202,16 @@ async def refine_email(refinement_request: EmailRefinementRequest = Body(...)):
         else:
             result = chain.invoke({"email_content": email_content})
 
-        return {"refinedEmail": result}
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/score-email")
 async def score_email_endpoint(request: EmailScoreRequest):
     try:
-        # Define the response schemas
-        response_schemas = [
-            ResponseSchema(name="scores", description="JSON object with scores for each criterion (subjectLine, writingStyle, content, structure, personalization) from 0-10"),
-            ResponseSchema(name="suggestions", description="Concise improvement suggestions for the email")
-        ]
+        # Using JSON output parser
+        json_parser = JsonOutputParser()
         
-        # Create a structured output parser
-        parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        
-        # Get format instructions
-        format_instructions = parser.get_format_instructions()
-        
-        # Create a prompt template
         prompt_template = """
         Bạn là một chuyên gia đánh giá email. Hãy đánh giá email sau và cung cấp:
         1. Điểm số từ 0 đến 10 cho mỗi tiêu chí sau:
@@ -191,7 +222,17 @@ async def score_email_endpoint(request: EmailScoreRequest):
            - Cá nhân hóa (personalization)
         2. Đề xuất cải thiện *ngắn gọn* cho email. Tóm tắt các ý chính, không cần giải thích dài dòng.
         
-        {format_instructions}
+        Trả về kết quả dưới dạng JSON với định dạng:
+        {{
+          "scores": {{
+            "subjectLine": [Điểm số từ 0-10],
+            "writingStyle": [Điểm số từ 0-10],
+            "content": [Điểm số từ 0-10], 
+            "structure": [Điểm số từ 0-10],
+            "personalization": [Điểm số từ 0-10]
+          }},
+          "suggestions": "Đề xuất cải thiện ngắn gọn ở đây"
+        }}
 
         Email cần đánh giá:
         {email_content}
@@ -200,45 +241,12 @@ async def score_email_endpoint(request: EmailScoreRequest):
         prompt = PromptTemplate.from_template(prompt_template)
         
         # Create the chain
-        chain = (
-            {
-                "format_instructions": format_instructions,
-                "email_content": lambda x: x["email_content"]
-            }
-            | prompt
-            | llm
-            | parser
-        )
+        chain = prompt | llm | json_parser
         
         # Invoke the chain with the email content
         evaluation_result = chain.invoke({"email_content": request.emailContent})
         
-        # Ensure scores are properly formatted
-        formatted_scores = {}
-        if isinstance(evaluation_result["scores"], str):
-            # If scores come back as a string (like a JSON string), evaluate it
-            import json
-            try:
-                formatted_scores = json.loads(evaluation_result["scores"].replace("'", '"'))
-            except:
-                # Fallback with default scores if parsing fails
-                formatted_scores = {
-                    "subjectLine": 5,
-                    "writingStyle": 5,
-                    "content": 5,
-                    "structure": 5,
-                    "personalization": 5
-                }
-        else:
-            formatted_scores = evaluation_result["scores"]
-        
-        # Create the final response
-        response = {
-            "scores": formatted_scores,
-            "suggestions": evaluation_result["suggestions"]
-        }
-        
-        return response
+        return evaluation_result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scoring email: {str(e)}")
