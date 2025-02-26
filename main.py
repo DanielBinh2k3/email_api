@@ -9,7 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from pydantic_extra_types.phone_numbers import PhoneNumber
+# from pydantic_extra_types.phone_numbers import PhoneNumber
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.llms import LLM, BaseLLM
 
