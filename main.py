@@ -65,6 +65,7 @@ origins = [
     "http://localhost:3000",  # Allow your React frontend (adjust if needed)
     "http://localhost:3001", # Add other allowed origins here, if any
     "http://localhost:8000",
+    "https://email-automation-mbw.vercel.app/",
 ]
 
 app.add_middleware(
