@@ -344,18 +344,19 @@ async def score_email_endpoint(request: EmailScoreRequest):
         
         chain = (
             RunnablePassthrough.assign(
-                format_instructions=lambda _: format_instructions,
-                subjectLine="Đánh giá tiêu đề email",
-                writingStyle="Đánh giá phong cách viết", 
-                content="Đánh giá nội dung chính",
-                structure="Đánh giá cấu trúc email",
-                personalization="Đánh giá mức độ cá nhân hóa",
-                suggestions="Đề xuất cải thiện chi tiết"
+                 format_instructions=lambda _: format_instructions,
+                 subjectLine=lambda _: "Đánh giá tiêu đề email",
+                 writingStyle=lambda _: "Đánh giá phong cách viết",
+                 content=lambda _: "Đánh giá nội dung chính",
+                 structure=lambda _: "Đánh giá cấu trúc email",
+                 personalization=lambda _: "Đánh giá mức độ cá nhân hóa",
+                 suggestions=lambda _: "Đề xuất cải thiện chi tiết"
             )
             | PromptTemplate.from_template(prompt_template)
             | llm
             | JsonOutputParser()
         )
+
         
         result = chain.invoke({"email_content": request.emailContent})
         
