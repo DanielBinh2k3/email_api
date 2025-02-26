@@ -324,19 +324,19 @@ async def score_email_endpoint(request: EmailScoreRequest):
         # Get the requested LLM
         llm = get_llm(request.model, request.temperature)
                 
-        prompt_template = f"""
+        prompt_template = """
         Bạn là một chuyên gia đánh giá email. Hãy đánh giá email sau và cung cấp:
         1. Điểm số từ 0 đến 10 cho mỗi tiêu chí sau:
-        - Tiêu đề: {{subjectLine}}
-        - Phong cách viết: {{writingStyle}}
-        - Nội dung: {{content}}
-        - Cấu trúc: {{structure}}
-        - Cá nhân hóa: {{personalization}}
+        - Tiêu đề: {subjectLine}
+        - Phong cách viết: {writingStyle}
+        - Nội dung: {content}
+        - Cấu trúc: {structure}
+        - Cá nhân hóa: {personalization}
         2. Đề xuất cải thiện *ngắn gọn* cho email. Tóm tắt các ý chính, không cần giải thích dài dòng.
         Đánh giá email theo các tiêu chí sau (0-10):
         
         Email đánh giá:
-        {{email_content}}
+        {email_content}
         Trả về kết quả dưới dạng JSON với định dạng:
         ```json
         {{
