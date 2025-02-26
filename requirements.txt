@@ -1,0 +1,9 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+pydantic==2.6.1
+pydantic[email]==2.6.1
+python-dotenv==1.0.0
+google-generativeai
+langchain-google-genai
+langchain-core
+langchain
