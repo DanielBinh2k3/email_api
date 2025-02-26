@@ -323,25 +323,34 @@ async def score_email_endpoint(request: EmailScoreRequest):
     try:
         # Get the requested LLM
         llm = get_llm(request.model, request.temperature)
-        
-        format_instructions = build_format_instructions(request.outputFormat)
-        
+                
         prompt_template = f"""
-        Đánh giá email theo các tiêu chí sau (0-10):
+        Bạn là một chuyên gia đánh giá email. Hãy đánh giá email sau và cung cấp:
+        1. Điểm số từ 0 đến 10 cho mỗi tiêu chí sau:
         - Tiêu đề: {{subjectLine}}
         - Phong cách viết: {{writingStyle}}
         - Nội dung: {{content}}
         - Cấu trúc: {{structure}}
         - Cá nhân hóa: {{personalization}}
-        
-        Đề xuất cải thiện: {{suggestions}}
+        2. Đề xuất cải thiện *ngắn gọn* cho email. Tóm tắt các ý chính, không cần giải thích dài dòng.
+        Đánh giá email theo các tiêu chí sau (0-10):
         
         Email đánh giá:
         {{email_content}}
-        
-        {format_instructions}
+        Trả về kết quả dưới dạng JSON với định dạng:
+        ```json
+        {{
+          "scores": {{
+            "subjectLine": [Điểm số từ 0-10],
+            "writingStyle": [Điểm số từ 0-10],
+            "content": [Điểm số từ 0-10], 
+            "structure": [Điểm số từ 0-10],
+            "personalization": [Điểm số từ 0-10]
+          }},
+          "suggestions": "Đề xuất cải thiện ngắn gọn ở đây"
+        }}
+        ```
         """
-        
         chain = (
             RunnablePassthrough.assign(
                  subjectLine=lambda _: "Đánh giá tiêu đề email",
@@ -349,7 +358,6 @@ async def score_email_endpoint(request: EmailScoreRequest):
                  content=lambda _: "Đánh giá nội dung chính",
                  structure=lambda _: "Đánh giá cấu trúc email",
                  personalization=lambda _: "Đánh giá mức độ cá nhân hóa",
-                 suggestions=lambda _: "Đề xuất cải thiện chi tiết"
             )
             | PromptTemplate.from_template(prompt_template)
             | llm
