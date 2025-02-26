@@ -324,27 +324,26 @@ async def score_email_endpoint(request: EmailScoreRequest):
         # Get the requested LLM
         llm = get_llm(request.model, request.temperature)
         
-        prompt_template = """
-        Đánh giá email theo các tiêu chí sau (0-10):
-        - Tiêu đề: {subjectLine}
-        - Phong cách viết: {writingStyle}
-        - Nội dung: {content}
-        - Cấu trúc: {structure}
-        - Cá nhân hóa: {personalization}
+        format_instructions = build_format_instructions(request.outputFormat)
         
-        Đề xuất cải thiện: {suggestions}
+        prompt_template = f"""
+        Đánh giá email theo các tiêu chí sau (0-10):
+        - Tiêu đề: {{subjectLine}}
+        - Phong cách viết: {{writingStyle}}
+        - Nội dung: {{content}}
+        - Cấu trúc: {{structure}}
+        - Cá nhân hóa: {{personalization}}
+        
+        Đề xuất cải thiện: {{suggestions}}
         
         Email đánh giá:
-        {email_content}
+        {{email_content}}
         
         {format_instructions}
         """
         
-        format_instructions = build_format_instructions(request.outputFormat)
-        
         chain = (
             RunnablePassthrough.assign(
-                 format_instructions=lambda _: format_instructions,
                  subjectLine=lambda _: "Đánh giá tiêu đề email",
                  writingStyle=lambda _: "Đánh giá phong cách viết",
                  content=lambda _: "Đánh giá nội dung chính",
@@ -356,7 +355,6 @@ async def score_email_endpoint(request: EmailScoreRequest):
             | llm
             | JsonOutputParser()
         )
-
         
         result = chain.invoke({"email_content": request.emailContent})
         
